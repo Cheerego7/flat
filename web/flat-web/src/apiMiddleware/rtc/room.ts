@@ -1,4 +1,5 @@
 import AgoraRTC, { IAgoraRTCClient } from "agora-rtc-sdk-ng";
+import EventEmitter from "eventemitter3";
 import { AGORA } from "../../constants/Process";
 import { globalStore } from "../../stores/GlobalStore";
 import { generateRTCToken } from "../flatServer/agora";
@@ -12,18 +13,40 @@ export enum RtcChannelType {
     Broadcast = 1,
 }
 
+export enum RTCMessageType {
+    /** receive RTC meta data */
+    ReceiveMetaData = "ReceiveMetaData",
+}
+
+export type RTCEvents = {
+    [RTCMessageType.ReceiveMetaData]: number;
+};
+
+export declare interface Rtm {
+    on<U extends keyof RTCEvents>(event: U, listener: (value: RTCEvents[U]) => void): this;
+    once<U extends keyof RTCEvents>(event: U, listener: (value: RTCEvents[U]) => void): this;
+}
+
 /**
  * Flow:
  * ```
- * join() -> now it has `client`
+ * join() -> now it has `client
  *   getLatency() -> number
  * destroy()
  * ```
  */
-export class RtcRoom {
+export class RtcRoom extends EventEmitter {
     public client?: IAgoraRTCClient;
+    public codec?: "h264" | "vp8";
+    public getTimestamp: number | undefined;
 
     private roomUUID?: string;
+    private sendMetadataTimer: number = NaN;
+
+    public constructor(config: { getTimestamp: number | undefined }) {
+        super();
+        this.getTimestamp = config.getTimestamp;
+    }
 
     public async join({
         roomUUID,
@@ -41,15 +64,22 @@ export class RtcRoom {
         }
 
         const mode = channelType === RtcChannelType.Communication ? "rtc" : "live";
-        this.client = AgoraRTC.createClient({ mode, codec: "vp8" });
+        const codec = channelType === RtcChannelType.Broadcast && isCreator ? "h264" : "vp8";
+        this.client = AgoraRTC.createClient({ mode, codec });
+        this.codec = codec;
 
         this.client.on("token-privilege-will-expire", this.renewToken);
 
-        if (mode !== "rtc") {
-            await this.client.setClientRole(
-                channelType === RtcChannelType.Broadcast && !isCreator ? "audience" : "host",
-            );
+        if (channelType === RtcChannelType.Broadcast) {
+            const role = isCreator ? "host" : "audience";
+            await this.client.setClientRole(role, { level: isCreator ? 2 : 1 });
+
+            this.client.on("receive-metadata", (uid: number, data: Uint8Array) => {
+                this.emit(RTCMessageType.ReceiveMetaData, uid, data);
+            });
+            this.sendMetaData(5000);
         }
+
         const token = globalStore.rtcToken || (await generateRTCToken(roomUUID));
         await this.client.join(AGORA.APP_ID, roomUUID, token, rtcUID);
 
@@ -65,7 +95,19 @@ export class RtcRoom {
             this.client.off("token-privilege-will-expire", this.renewToken);
             await this.client.leave();
             this.client = undefined;
+            clearTimeout(this.sendMetadataTimer);
         }
+    }
+
+    /**
+     * @param intervalMS should > 2s
+     */
+    public sendMetaData(intervalMS: number): void {
+        clearTimeout(this.sendMetadataTimer);
+
+        this.sendMetadataTimer = setTimeout(() => {
+            (this.client as any).sendMetadata(new TextEncoder().encode(String(this.getTimestamp)));
+        }, intervalMS);
     }
 
     private renewToken = async (): Promise<void> => {

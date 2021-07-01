@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { action, autorun, makeAutoObservable, observable, runInAction } from "mobx";
 import { v4 as uuidv4 } from "uuid";
 import dateSub from "date-fns/sub";
-import { RtcRoom as RTCAPI, RtcChannelType } from "../apiMiddleware/rtc/room";
+import { RtcRoom as RTCAPI, RtcChannelType, RTCMessageType } from "../apiMiddleware/rtc/room";
 import {
     ClassModeType,
     NonDefaultUserProp,
@@ -121,7 +121,14 @@ export class ClassRoomStore {
         this.classMode = config.classMode ?? ClassModeType.Lecture;
         this.rtcChannelType = config.recordingConfig.channelType ?? RtcChannelType.Communication;
 
-        this.rtc = new RTCAPI();
+        this.whiteboardStore = new WhiteboardStore({
+            isCreator: this.isCreator,
+        });
+
+        this.rtc = new RTCAPI({
+            getTimestamp: this.whiteboardStore.getTimestamp(),
+        });
+
         (window as any).rtc = this.rtc;
         this.rtm = new RTMAPI();
         this.cloudRecording = new CloudRecording({ roomUUID: config.roomUUID });
@@ -144,10 +151,6 @@ export class ClassRoomStore {
             userUUID: this.userUUID,
         });
 
-        this.whiteboardStore = new WhiteboardStore({
-            isCreator: this.isCreator,
-        });
-
         autorun(reaction => {
             if (this.whiteboardStore.isKicked) {
                 reaction.dispose();
@@ -162,6 +165,12 @@ export class ClassRoomStore {
             runInAction(() => {
                 this.isRemoteLogin = true;
             });
+        });
+
+        this.rtc.on(RTCMessageType.ReceiveMetaData, (uid: string | number, data: Uint8Array) => {
+            console.log("%c data", "color: pink; font-size: 21px", data);
+            const timestamp = Number(new TextDecoder().decode(data));
+            this.whiteboardStore.syncTimestamp(timestamp);
         });
     }
 
@@ -529,10 +538,10 @@ export class ClassRoomStore {
 
         promises.push(this.leaveRTC());
 
-        this.whiteboardStore.destroy();
-
         this.offRTCEvents();
         this.rtc.destroy();
+
+        this.whiteboardStore.destroy();
 
         window.clearTimeout(this._collectChannelStatusTimeout);
 
