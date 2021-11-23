@@ -3,9 +3,18 @@
     padding-bottom: 8px;
 }
 
-.camera-box {
+.camera-test-wrapper {
     height: 240px;
     width: 100%;
+    position: relative;
+}
+
+.camera-box {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
 }
 
 .camera-test-select-box {
@@ -13,15 +22,25 @@
 }
 
 .camera-no-accredit-box {
-    display: flex;
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: none;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     height: 240px;
     border-radius: 4px;
     background: #1a1e21;
+    z-index: 1;
 
     > span {
         color: rgba(255, 255, 255, 0.5);
+    }
+
+    &.visible {
+        display: flex;
     }
 }

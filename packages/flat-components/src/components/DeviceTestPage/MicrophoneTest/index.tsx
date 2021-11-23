@@ -28,7 +28,10 @@ export const MicrophoneTest: React.FC<MicrophoneTestProps> = ({
                 />
             </div>
             <div className="microphone-test-wrapper">
-                <div className="microphone-test-volume" style={{ width: `${microphoneVolume}%` }} />
+                <div
+                    className="microphone-test-volume"
+                    style={{ width: `${microphoneVolume * 100}%` }}
+                />
                 <div className="microphone-test-mask" />
             </div>
         </div>

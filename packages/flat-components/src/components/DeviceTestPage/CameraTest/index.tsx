@@ -2,6 +2,7 @@ import "./style.less";
 import cameraDisabledSVG from "../icons/camera-disabled.svg";
 
 import React from "react";
+import classNames from "classnames";
 import { Device } from "../constants";
 import { DeviceTestSelect } from "../DeviceTestSelect";
 
@@ -28,14 +29,17 @@ export const CameraTest: React.FC<CameraTestProps> = ({
                     onChange={onChange}
                 />
             </div>
-            {isCameraGranted ? (
+            <div className="camera-test-wrapper">
                 <div className="camera-box" ref={cameraVideoStreamRef} />
-            ) : (
-                <div className="camera-no-accredit-box">
+                <div
+                    className={classNames("camera-no-accredit-box", {
+                        visible: !isCameraGranted,
+                    })}
+                >
                     <img src={cameraDisabledSVG} />
                     <span>请开启浏览器的摄像头使用权限</span>
                 </div>
-            )}
+            </div>
         </div>
     );
 };
