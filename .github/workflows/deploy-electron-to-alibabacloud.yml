@@ -1,0 +1,28 @@
+name: Deploy Electron To AlibabaCloud
+on:
+  push:
+    branches:
+      - "main"
+
+jobs:
+  build-electron:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Build Electron
+        run: |
+          yarn ship
+
+      - name: Deploy
+        uses: easingthemes/ssh-deploy@v2.2.11
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          ACCESS_KEY: ${{ secrets.ALIBABA_CLOUD_ACCESS_KEY }}
+          SOURCE: "build/" #current file dir
+          REMOTE_HOST: ${{ secrets.REMOTE_HOST }}
+          REMOTE_PORT: ${{ secrets.REMOTE_PORT }}
+          REMOTE_USER: root
+          REMOTE_TARGET: ${{ secrets.REMOTE_TARGET }}
